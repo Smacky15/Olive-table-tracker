@@ -2,49 +2,91 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Table Tracker</title>
   <style>
+    * { box-sizing: border-box; }
     body {
-      font-family: Arial, sans-serif;
       margin: 0;
-      padding: 20px;
-      background: #f8f8f8;
+      font-family: Arial, sans-serif;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
     }
-    h1 {
-      text-align: center;
+    .sidebar {
+      width: 300px;
+      background: #f0f0f0;
+      padding: 20px;
+      border-right: 2px solid #ccc;
+      display: none;
+      flex-direction: column;
+    }
+    .main {
+      flex: 1;
+      background: #e0e0e0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
     }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
       gap: 10px;
+      padding: 10px;
+      width: 100%;
+      max-width: 800px;
     }
     .table {
-      background: #fff;
-      border: 2px solid #ccc;
-      border-radius: 10px;
+      border-radius: 8px;
       padding: 10px;
+      color: #000;
       text-align: center;
+      font-size: 14px;
+      font-weight: bold;
       cursor: pointer;
+      background: white;
+      border: 2px solid #aaa;
       transition: 0.2s ease-in-out;
     }
-    .table.ready { border-color: green; }
-    .table.sat { border-color: red; }
-    .table.dirty { border-color: gray; }
-    .table.closed { border-color: black; background: #eee; color: #666; }
+    .sat    { background: #6f6; border-color: #4c4; }
+    .dirty  { background: orange; border-color: #e68a00; }
+    .closed { background: red; color: white; border-color: #b00; }
+    .sidebar.visible { display: flex; }
+
     .time {
-      font-size: 0.8em;
-      margin-top: 5px;
+      font-size: 0.85em;
+      margin-top: 4px;
+      color: #555;
     }
     button {
-      margin-top: 5px;
-      font-size: 0.7em;
+      margin: 5px 0;
+      padding: 8px;
+      font-size: 1em;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
     }
+    .btn-cycle { background: #007bff; color: white; }
+    .btn-dirty { background: orange; }
+    .btn-close { background: red; color: white; }
+    .btn-open  { background: green; color: white; }
   </style>
 </head>
-<body>
-  <h1>Olive Garden Table Tracker</h1>
-  <div class="grid" id="tableGrid"></div>
+<body onclick="hidePanel(event)">
+
+  <div class="sidebar" id="sidebar">
+    <h2>Table <span id="tableNum">--</span></h2>
+    <div>Status: <strong id="statusText"></strong></div>
+    <div class="time" id="timeAgo"></div>
+    <button class="btn-cycle" onclick="cycleStatus()">Seat / Open / Dirty</button>
+    <button class="btn-close" onclick="setClosed()">Close Table</button>
+    <button class="btn-open" onclick="setOpen()">Open Table</button>
+  </div>
+
+  <div class="main">
+    <div class="grid" id="grid"></div>
+  </div>
 
   <script>
     const tables = [
@@ -60,64 +102,82 @@
       101,102,103,104,105,106
     ];
 
-    const statuses = ['ready', 'sat', 'dirty'];
-    let state = {};
+    const grid = document.getElementById("grid");
+    const sidebar = document.getElementById("sidebar");
+    const tableNumEl = document.getElementById("tableNum");
+    const statusText = document.getElementById("statusText");
+    const timeAgo = document.getElementById("timeAgo");
 
-    function minutesAgo(timestamp) {
-      const now = new Date();
-      const diff = Math.floor((now - new Date(timestamp)) / 60000);
-      return diff <= 0 ? 'Just now' : diff + ' min ago';
+    let state = {};
+    let selected = null;
+
+    function minutesAgo(time) {
+      const mins = Math.floor((Date.now() - new Date(time)) / 60000);
+      return mins <= 0 ? 'Just now' : `${mins} min ago`;
     }
 
-    function updateTableDisplay() {
-      const grid = document.getElementById("tableGrid");
-      grid.innerHTML = "";
-      tables.forEach(num => {
-        const t = state[num] || { status: 'ready', time: new Date() };
-        const div = document.createElement("div");
-        div.className = "table " + t.status;
-        div.innerHTML = `
-          <strong>Table ${num}</strong><br/>
-          <em>Status:</em> ${t.status.charAt(0).toUpperCase() + t.status.slice(1)}<br/>
-          <div class="time">Updated: ${minutesAgo(t.time)}</div>
-          <button onclick="nextStatus(${num})">Cycle</button>
-          <button onclick="toggleClosed(${num})">Close/Open</button>
-        `;
+    function drawGrid() {
+      grid.innerHTML = '';
+      tables.forEach(n => {
+        const { status, time } = state[n];
+        const div = document.createElement('div');
+        div.className = `table ${status}`;
+        div.innerHTML = `#${n}<div class="time">${minutesAgo(time)}</div>`;
+        div.onclick = (e) => {
+          e.stopPropagation();
+          openPanel(n);
+        };
         grid.appendChild(div);
       });
     }
 
-    function nextStatus(num) {
-      const t = state[num] || { status: 'ready', time: new Date() };
-      if (t.status === 'closed') return;
-      const i = statuses.indexOf(t.status);
-      const next = statuses[(i + 1) % statuses.length];
-      state[num] = { status: next, time: new Date() };
-      updateTableDisplay();
+    function openPanel(tableNum) {
+      selected = tableNum;
+      const { status, time } = state[tableNum];
+      tableNumEl.textContent = tableNum;
+      statusText.textContent = status.toUpperCase();
+      timeAgo.textContent = `Updated: ${minutesAgo(time)}`;
+      sidebar.classList.add('visible');
     }
 
-    function toggleClosed(num) {
-      const t = state[num] || { status: 'ready', time: new Date() };
-      if (t.status === 'closed') {
-        state[num] = { status: 'ready', time: new Date() };
-      } else {
-        state[num] = { status: 'closed', time: new Date() };
+    function hidePanel(e) {
+      if (!e.target.closest('.sidebar') && !e.target.closest('.table')) {
+        sidebar.classList.remove('visible');
+        selected = null;
       }
-      updateTableDisplay();
     }
 
-    function refreshTimes() {
-      updateTableDisplay();
+    function cycleStatus() {
+      const current = state[selected].status;
+      const next = current === 'open' ? 'sat' :
+                   current === 'sat' ? 'dirty' : 'open';
+      state[selected] = { status: next, time: new Date() };
+      drawGrid();
+      openPanel(selected);
     }
 
-    setInterval(refreshTimes, 60000); // Update times every 60 seconds
+    function setClosed() {
+      state[selected] = { status: 'closed', time: new Date() };
+      drawGrid();
+      openPanel(selected);
+    }
 
-    window.onload = () => {
-      tables.forEach(num => {
-        state[num] = { status: 'ready', time: new Date() };
-      });
-      updateTableDisplay();
-    };
+    function setOpen() {
+      state[selected] = { status: 'open', time: new Date() };
+      drawGrid();
+      openPanel(selected);
+    }
+
+    function updateTimers() {
+      drawGrid();
+      if (selected) openPanel(selected);
+    }
+
+    // Initialize all tables
+    tables.forEach(n => state[n] = { status: 'open', time: new Date() });
+    drawGrid();
+    setInterval(updateTimers, 60000); // refresh every minute
   </script>
+
 </body>
 </html>
