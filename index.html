@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Table Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f8f8f8;
+    }
+    h1 {
+      text-align: center;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+    }
+    .table {
+      background: #fff;
+      border: 2px solid #ccc;
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.2s ease-in-out;
+    }
+    .table.ready { border-color: green; }
+    .table.sat { border-color: red; }
+    .table.dirty { border-color: gray; }
+    .table.closed { border-color: black; background: #eee; color: #666; }
+    .time {
+      font-size: 0.8em;
+      margin-top: 5px;
+    }
+    button {
+      margin-top: 5px;
+      font-size: 0.7em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Olive Garden Table Tracker</h1>
+  <div class="grid" id="tableGrid"></div>
+
+  <script>
+    const tables = [
+      11,12,13,14,15,16,17,18,19,
+      21,22,23,24,25,26,
+      31,32,33,34,35,
+      41,42,43,44,45,46,47,
+      51,52,53,54,55,56,
+      61,62,63,64,65,66,67,68,69,
+      71,72,73,74,75,76,
+      81,82,83,84,85,
+      91,92,93,94,95,
+      101,102,103,104,105,106
+    ];
+
+    const statuses = ['ready', 'sat', 'dirty'];
+    let state = {};
+
+    function minutesAgo(timestamp) {
+      const now = new Date();
+      const diff = Math.floor((now - new Date(timestamp)) / 60000);
+      return diff <= 0 ? 'Just now' : diff + ' min ago';
+    }
+
+    function updateTableDisplay() {
+      const grid = document.getElementById("tableGrid");
+      grid.innerHTML = "";
+      tables.forEach(num => {
+        const t = state[num] || { status: 'ready', time: new Date() };
+        const div = document.createElement("div");
+        div.className = "table " + t.status;
+        div.innerHTML = `
+          <strong>Table ${num}</strong><br/>
+          <em>Status:</em> ${t.status.charAt(0).toUpperCase() + t.status.slice(1)}<br/>
+          <div class="time">Updated: ${minutesAgo(t.time)}</div>
+          <button onclick="nextStatus(${num})">Cycle</button>
+          <button onclick="toggleClosed(${num})">Close/Open</button>
+        `;
+        grid.appendChild(div);
+      });
+    }
+
+    function nextStatus(num) {
+      const t = state[num] || { status: 'ready', time: new Date() };
+      if (t.status === 'closed') return;
+      const i = statuses.indexOf(t.status);
+      const next = statuses[(i + 1) % statuses.length];
+      state[num] = { status: next, time: new Date() };
+      updateTableDisplay();
+    }
+
+    function toggleClosed(num) {
+      const t = state[num] || { status: 'ready', time: new Date() };
+      if (t.status === 'closed') {
+        state[num] = { status: 'ready', time: new Date() };
+      } else {
+        state[num] = { status: 'closed', time: new Date() };
+      }
+      updateTableDisplay();
+    }
+
+    function refreshTimes() {
+      updateTableDisplay();
+    }
+
+    setInterval(refreshTimes, 60000); // Update times every 60 seconds
+
+    window.onload = () => {
+      tables.forEach(num => {
+        state[num] = { status: 'ready', time: new Date() };
+      });
+      updateTableDisplay();
+    };
+  </script>
+</body>
+</html>
